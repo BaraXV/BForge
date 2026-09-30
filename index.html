@@ -4,307 +4,525 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>JAI FORGE — workshop publisher</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Berkshire+Swash&family=Crimson+Text:ital,wght@0,400,0,600,0,700,1,400&family=Dancing+Script:wght@400;700&family=Fraunces:ital,wght@0,400,0,500,0,600,0,700,1,400&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Jura:wght@300;400;500;600;700&family=Lexend:wght@300;400;600;700&family=Monoton&family=Poppins:ital,wght@0,300,0,400,0,600,0,700,1,400&family=Press+Start+2P&family=Rock+Salt&family=VT323&display=swap">
 <style>
   :root {
-    --bg: rgb(18,16,24); --panel: rgb(26,24,32); --edge: rgb(60,52,84);
+    --bg: rgb(16,14,20); --panel: rgb(24,22,30); --panel2: rgb(20,18,26);
+    --edge: rgb(58,50,80); --edge2: rgb(80,66,110);
     --text: rgb(232,226,222); --dim: rgb(150,145,160);
     --accent: rgb(120,90,180); --accent2: rgb(196,160,228);
     --gold: rgb(212,175,85); --ok: rgb(140,200,140); --bad: rgb(235,98,98);
+    --ember: rgb(235,130,90);
   }
   * { box-sizing: border-box; }
   body { margin:0; background:var(--bg); color:var(--text);
-         font-family:'Segoe UI', sans-serif; font-size:14px; }
-  header { padding:14px 20px; background:var(--panel);
-           border-bottom:1px solid var(--edge);
-           display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
-  header h1 { margin:0; font-size:18px; color:var(--accent2);
-              letter-spacing:0.08em; font-weight:600; }
+         font-family:'Segoe UI', sans-serif; font-size:14px; overflow-x:hidden; }
+  #emberCanvas { position:fixed; inset:0; z-index:0; pointer-events:none; }
+  .wrap { position:relative; z-index:1; padding:14px 18px; max-width:1500px; margin:0 auto; }
+  header { display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:12px; }
+  header h1 { margin:0; font-size:20px; color:var(--ember);
+              letter-spacing:0.1em; font-weight:700;
+              text-shadow:0 0 24px rgba(235,130,90,0.35); }
   header .tag { color:var(--dim); font-size:12px; }
   header .spacer { flex:1; }
-  .wrap { padding:16px 20px; max-width:1400px; margin:0 auto; }
-  .row { display:flex; gap:14px; flex-wrap:wrap; margin-bottom:14px; align-items:flex-end; }
-  .field { display:flex; flex-direction:column; gap:4px; }
-  .field label { font-size:11px; color:var(--dim); letter-spacing:0.08em; text-transform:uppercase; }
-  .field input { background:var(--bg); color:var(--text); border:1px solid var(--edge);
-                 border-radius:6px; padding:8px 10px; font-size:13px; width:420px; max-width:90vw;
-                 font-family:monospace; }
-  .field input.small { width:340px; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px; align-items:flex-end; }
+  .field { display:flex; flex-direction:column; gap:4px; flex:1 1 300px; }
+  .field label { font-size:10px; color:var(--dim); letter-spacing:0.12em; text-transform:uppercase; }
+  .field input { background:var(--panel2); color:var(--text); border:1px solid var(--edge);
+                 border-radius:6px; padding:8px 10px; font-size:13px; width:100%;
+                 font-family:Consolas, monospace; }
+  .field input:focus { outline:none; border-color:var(--accent);
+                       box-shadow:0 0 16px rgba(120,90,180,0.25); }
   button { background:var(--accent); color:#fff; border:none; border-radius:6px;
            padding:8px 14px; font-size:13px; cursor:pointer; font-family:inherit; }
-  button:hover { filter:brightness(1.15); }
+  button:hover { filter:brightness(1.18); }
+  button:disabled { opacity:0.5; cursor:default; }
   button.ghost { background:transparent; border:1px solid var(--edge); color:var(--dim); }
-  button.gold { background:var(--gold); color:rgb(24,20,10); font-weight:600; }
-  .cols { display:flex; gap:14px; flex-wrap:wrap; }
-  .col { flex:1; min-width:320px; }
-  .col h2 { margin:0 0 8px 0; font-size:12px; color:var(--dim);
-            letter-spacing:0.12em; text-transform:uppercase; }
-  textarea { width:100%; height:460px; background:var(--bg); color:var(--text);
-             border:1px solid var(--edge); border-radius:6px; padding:10px;
-             font-family:Consolas, monospace; font-size:12px; line-height:1.5;
-             resize:vertical; }
-  #preview { height:460px; overflow:auto; background:#fff; border:1px solid var(--edge);
-             border-radius:6px; padding:10px; }
-  #log { margin-top:14px; background:var(--panel); border:1px solid var(--edge);
-         border-radius:6px; padding:10px 14px; font-family:monospace; font-size:12px;
-         color:var(--dim); white-space:pre-wrap; max-height:200px; overflow:auto; }
-  .modal { position:fixed; inset:0; background:rgba(0,0,0,0.7); display:none;
-           align-items:center; justify-content:center; z-index:99; }
-  .modal.open { display:flex; }
-  .modal .box { background:var(--panel); border:1px solid var(--edge); border-radius:10px;
-                padding:20px; max-width:640px; width:92vw; max-height:86vh; overflow:auto; }
-  .modal h3 { margin:0 0 10px 0; color:var(--accent2); font-size:15px; }
-  .modal pre { background:var(--bg); border:1px solid var(--edge); border-radius:6px;
-               padding:10px; font-size:11px; overflow:auto; max-height:200px; color:var(--gold); }
-  .modal ol { color:var(--dim); line-height:1.7; padding-left:20px; }
-  .note { font-size:11px; color:var(--dim); margin-top:6px; line-height:1.5; }
+  button.ghost:hover { color:var(--text); border-color:var(--edge2); }
+  button.gold { background:var(--gold); color:rgb(24,20,10); font-weight:700; }
+  button.ember { background:var(--ember); color:rgb(30,15,10); font-weight:700; }
+  .cols { display:flex; gap:12px; flex-wrap:wrap; }
+  .pane { flex:1 1 440px; min-width:320px; display:flex; flex-direction:column;
+          background:var(--panel); border:1px solid var(--edge); border-radius:8px; overflow:hidden; }
+  .pane-head { display:flex; align-items:center; justify-content:space-between;
+               padding:7px 12px; font-size:10px; color:var(--dim);
+               letter-spacing:0.14em; text-transform:uppercase;
+               background:rgba(120,90,180,0.08); border-bottom:1px solid var(--edge); }
+  .pane-head em { font-style:normal; text-transform:none; letter-spacing:0; opacity:0.75; }
+  .codewrap { position:relative; flex:1; min-height:380px; background:rgba(8,7,12,0.8); }
+  .codewrap pre, .codewrap textarea {
+    margin:0; position:absolute; inset:0; padding:12px;
+    font-family:Consolas, 'Cascadia Mono', monospace; font-size:12.5px; line-height:1.55;
+    white-space:pre-wrap; overflow-wrap:break-word; overflow:auto;
+    scrollbar-width:thin; scrollbar-color:rgba(120,90,180,0.5) transparent;
+  }
+  .codewrap pre { color:#fff; pointer-events:none; z-index:1; }
+  .codewrap textarea { background:transparent; color:transparent; caret-color:var(--accent2);
+                       border:0; outline:none; resize:none; z-index:2; }
+  .codewrap textarea::selection { background:rgba(120,90,180,0.45); color:transparent; }
+  .codewrap .t { color:#7ab8e8; } .codewrap .a { color:#a8d4f0; }
+  .codewrap .s { color:#e8b890; } .codewrap .c { color:#7a9a70; font-style:italic; }
+  .codewrap .p { color:#909090; }
+  #preview { flex:1; min-height:380px; width:100%; border:0; background:#141018; }
+  #toasts { position:fixed; right:14px; bottom:14px; z-index:90;
+            display:flex; flex-direction:column; gap:8px; max-width:min(560px, 92vw); }
+  .toast { background:var(--panel); border:1px solid var(--edge); border-left:3px solid var(--accent);
+           border-radius:8px; padding:10px 14px; font-size:13px; line-height:1.5;
+           box-shadow:0 12px 32px rgba(0,0,0,0.6); white-space:pre-wrap; animation:pop .15s ease-out; }
+  .toast.ok { border-left-color:var(--ok); }
+  .toast.error { border-left-color:var(--bad); }
+  .toast .title { font-weight:700; margin-bottom:2px; }
+  .toast.error .title { color:var(--bad); }
+  .toast .detail { margin-top:8px; padding:8px 10px; background:rgba(8,7,12,0.8);
+                   border:1px solid var(--edge); border-radius:6px;
+                   font-family:monospace; font-size:11px; color:var(--dim);
+                   max-height:120px; overflow:auto; }
+  @keyframes pop { from { opacity:0; transform:translateY(6px); } to { opacity:1; } }
+  dialog { margin:auto; border:1px solid var(--edge2); border-radius:10px;
+           background:var(--panel); color:var(--text); padding:0;
+           width:min(720px, 94vw); max-height:86vh; overflow:auto;
+           box-shadow:0 30px 60px rgba(0,0,0,0.7); }
+  dialog::backdrop { background:rgba(5,4,8,0.8); }
+  .dlg-body { padding:18px 22px; }
+  .dlg-body h3 { margin:0 0 10px; color:var(--accent2); font-size:15px; }
+  .dlg-body p, .dlg-body ol { color:var(--dim); line-height:1.7; font-size:13px; }
+  .dlg-body ol { padding-left:20px; }
+  .dlg-body pre { background:rgba(8,7,12,0.85); border:1px solid var(--edge); border-radius:6px;
+                  padding:10px; font-size:11px; overflow:auto; max-height:240px;
+                  color:var(--gold); white-space:pre; }
+  .dlg-actions { display:flex; justify-content:flex-end; gap:8px; padding:12px 22px;
+                 border-top:1px solid var(--edge); }
+  .tpl-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(200px,1fr));
+              gap:10px; margin:10px 0; }
+  .tpl { background:var(--panel2); border:1px solid var(--edge); border-radius:8px;
+         padding:12px; cursor:pointer; transition:border-color .2s; }
+  .tpl:hover { border-color:var(--ember); }
+  .tpl b { color:var(--ember); display:block; margin-bottom:4px; font-size:13px; }
+  .tpl span { color:var(--dim); font-size:11px; line-height:1.5; display:block; }
 </style>
 </head>
 <body>
-<header>
-  <h1>⬡ JAI FORGE</h1>
-  <span class="tag">workshop publisher · v0.1 · your token never leaves this browser</span>
-  <span class="spacer"></span>
-  <button class="ghost" onclick="openToken()">Get Access Token</button>
-</header>
-
+<canvas id="emberCanvas"></canvas>
 <div class="wrap">
+
+  <header>
+    <h1>⬡ JAI FORGE</h1>
+    <span class="tag">v0.2 · workshop publisher · your token never leaves this browser</span>
+    <span class="spacer"></span>
+    <button class="ghost" onclick="dlg('aboutDlg')">What is this?</button>
+  </header>
 
   <div class="row">
     <div class="field">
       <label>Target URL (character or script page)</label>
-      <input id="target" class="small" placeholder="https://janitorai.com/characters/UUID_name..."
-             oninput="saveState()">
+      <input id="target" placeholder="https://janitorai.com/characters/UUID_name..." oninput="saveState()">
     </div>
-    <div class="field">
+    <div class="field" style="flex:0 1 320px">
       <label>Access Token</label>
-      <input id="token" type="password" placeholder="paste token from Get Access Token"
-             oninput="saveState()">
+      <input id="token" type="password" placeholder="from Get Token" oninput="saveState()">
     </div>
-    <button onclick="loadCurrent()">Load Current Bio</button>
+    <button class="ghost" onclick="dlg('tokenDlg')">Get Token</button>
   </div>
 
   <div class="cols">
-    <div class="col">
-      <h2>HTML Source</h2>
-      <textarea id="html" oninput="renderPreview(); saveState()"
-        placeholder="Paste your bio HTML here..."></textarea>
-      <div class="note">Publishing sends exactly this HTML through JAI's API. The server strips only &lt;style&gt;, &lt;script&gt;, position, and z-index — everything else renders.</div>
+    <div class="pane">
+      <div class="pane-head"><span>HTML Source</span><em id="stat">0 chars</em></div>
+      <div class="codewrap">
+        <pre id="hl" aria-hidden="true"></pre>
+        <textarea id="html" spellcheck="false" aria-label="HTML source"
+          placeholder="Paste your bio HTML, load a file, or pick a template..."></textarea>
+      </div>
     </div>
-    <div class="col">
-      <h2>Live Preview</h2>
-      <div id="preview"></div>
+    <div class="pane">
+      <div class="pane-head"><span>Live Preview</span><em>on JAI snapshot css</em></div>
+      <iframe id="preview" title="Live preview"></iframe>
     </div>
   </div>
 
-  <div class="row" style="margin-top:14px">
-    <button class="ghost" onclick="loadExample()">Load Example</button>
-    <button class="ghost" onclick="lint()">Lint Check</button>
+  <div class="row" style="margin-top:12px">
+    <input type="file" id="fileInput" accept=".html,.htm,.txt" hidden>
+    <button class="ghost" onclick="fileInput.click()">Load File</button>
+    <button class="ghost" onclick="dlg('tplDlg')">Templates</button>
+    <button class="ghost" onclick="formatHtml()">Format</button>
+    <button class="ghost" onclick="lint()">Lint</button>
+    <button class="ghost" onclick="loadCurrent()">Load Current Bio</button>
     <button class="ghost" onclick="clearAll()">Clear</button>
-    <span class="spacer"></span>
-    <button class="gold" onclick="publish()">⚡ Publish to JAI</button>
+    <span class="spacer" style="flex:1"></span>
+    <button class="ember" onclick="publish()">⚡ Publish to JAI</button>
   </div>
 
-  <div id="log">ready.</div>
 </div>
 
-<div class="modal" id="scriptModal">
-  <div class="box">
-    <h3 id="scriptTitle">Script</h3>
-    <div class="note" id="scriptNote"></div>
-    <pre id="scriptBody"></pre>
-    <button onclick="copyScriptModal()">Copy Script</button>
-    <button class="ghost" onclick="closeScriptModal()">Close</button>
-  </div>
-</div>
-<div class="modal" id="tokenModal">
-  <div class="box">
+<dialog id="tokenDlg">
+  <div class="dlg-body">
     <h3>Get your access token</h3>
     <ol>
       <li>Copy the script below.</li>
-      <li>Open <strong>janitorai.com</strong> in a browser tab and make sure you're logged in.</li>
-      <li>Press <strong>F12</strong> → Console tab → paste the script → Enter.</li>
-      <li>Your token prints below the command. Copy it into the token field here.</li>
+      <li>Open <b>janitorai.com</b> in a tab, logged in.</li>
+      <li><b>F12</b> → Console → paste → Enter.</li>
+      <li>The token prints below the command — copy it into the token field.</li>
     </ol>
     <pre id="tokenScript"></pre>
-    <button onclick="copyTokenScript()">Copy Script</button>
-    <button class="ghost" onclick="closeToken()">Close</button>
-    <div class="note">The script only reads your own session cookie, in your own browser, and prints it. Nothing is sent anywhere.</div>
   </div>
-</div>
+  <div class="dlg-actions">
+    <button onclick="copyTokenScript()">Copy Script</button>
+    <button class="ghost" onclick="closeDlg('tokenDlg')">Close</button>
+  </div>
+</dialog>
+
+<dialog id="tplDlg">
+  <div class="dlg-body">
+    <h3>Templates</h3>
+    <p>Pick a starter — it loads into the editor. Everything is API-legal grammar: divs, flex, gradients, inline styles only. No position, no z-index.</p>
+    <div class="tpl-grid">
+      <div class="tpl" onclick="loadTemplate('gothic')"><b>Gothic Cathedral</b><span>The Blushing Blade header — gradient panels, flex pills, letterpress type. The full API-legal upgrade of the house look.</span></div>
+      <div class="tpl" onclick="loadTemplate('house')"><b>House v5 — Boxes</b><span>The platform-class build: shinybox hook, identity card, encounter chips. Survives the editor path too — the safe standard.</span></div>
+      <div class="tpl" onclick="loadTemplate('dossier')"><b>Dossier Card</b><span>Stat-card grammar: name lockup, key-value fields, quote slot, panel tinting. For cast pages and identity cards.</span></div>
+      <div class="tpl" onclick="loadTemplate('blank')"><b>Blank Frame</b><span>The minimum viable page: centered container, one panel, one title. Build from zero with the training wheels on.</span></div>
+    </div>
+  </div>
+  <div class="dlg-actions">
+    <button class="ghost" onclick="closeDlg('tplDlg')">Close</button>
+  </div>
+</dialog>
+
+<dialog id="scriptDlg">
+  <div class="dlg-body">
+    <h3 id="scriptTitle">Script</h3>
+    <p id="scriptNote"></p>
+    <pre id="scriptBody"></pre>
+  </div>
+  <div class="dlg-actions">
+    <button onclick="copyScript()">Copy Script</button>
+    <button class="ghost" onclick="closeDlg('scriptDlg')">Close</button>
+  </div>
+</dialog>
+
+<dialog id="aboutDlg">
+  <div class="dlg-body">
+    <h3>What is this?</h3>
+    <p>A workshop tool for publishing rich HTML bios and script pages to janitorai.com through its API — the method documented by <b>DelightfulTempe</b> (see their Unrestricted Bot Bio Guide) and inspired by Dezea's JAI_Publisher. The FORGE runs entirely in your browser:</p>
+    <ol>
+      <li>Preview runs on a local snapshot of JAI's stylesheet — nothing is uploaded while you edit.</li>
+      <li>Token and HTML live in your browser's local storage only.</li>
+      <li>Publishing generates a first-party console script — your token goes from your browser to janitorai.com and nowhere else. No relay, no third party.</li>
+    </ol>
+    <p><b>Be decent:</b> only publish to characters and scripts you own, keep layouts in-container, and don't break the page for visitors. The method survives by not being abused.</p>
+    <p>Lint checks for server-stripped constructs (<code>position</code>, <code>z-index</code>, <code>&lt;style&gt;</code>, <code>&lt;script&gt;</code>) and layout manners before you publish.</p>
+  </div>
+  <div class="dlg-actions">
+    <button class="ghost" onclick="closeDlg('aboutDlg')">Close</button>
+  </div>
+</dialog>
+
+<div id="toasts"></div>
 
 <script>
-/* ============ state ============ */
-var LS_KEY = 'jai-forge-state';
-function saveState() {
-  try {
-    localStorage.setItem(LS_KEY, JSON.stringify({
-      target: el('target').value, token: el('token').value, html: el('html').value
-    }));
-  } catch (e) {}
+/* ================= helpers ================= */
+function el(id){ return document.getElementById(id); }
+function toast(msg, kind, detail, sticky){
+  var t = document.createElement('div');
+  t.className = 'toast' + (kind ? ' ' + kind : '');
+  var head = document.createElement('div');
+  head.className = 'title';
+  head.textContent = kind === 'error' ? 'Error' : (kind === 'ok' ? 'Done' : 'Note');
+  t.appendChild(head);
+  var body = document.createElement('div');
+  body.textContent = msg;
+  t.appendChild(body);
+  if (detail) {
+    var d = document.createElement('div');
+    d.className = 'detail';
+    d.textContent = detail;
+    t.appendChild(d);
+  }
+  el('toasts').appendChild(t);
+  setTimeout(function(){
+    t.style.transition = 'opacity .25s'; t.style.opacity = '0';
+    setTimeout(function(){ t.remove(); }, 260);
+  }, sticky ? 15000 : 3500);
 }
-function loadState() {
-  try {
-    var s = JSON.parse(localStorage.getItem(LS_KEY) || '{}');
-    el('target').value = s.target || '';
-    el('token').value = s.token || '';
+function dlg(id){ el(id).showModal(); }
+function closeDlg(id){ el(id).close(); }
+
+/* ================= state ================= */
+var LS_KEY = 'jai-forge-v2';
+function saveState(){
+  try { localStorage.setItem(LS_KEY, JSON.stringify({
+    target: el('target').value, token: el('token').value, html: el('html').value
+  })); } catch(e){}
+}
+function loadState(){
+  try { var s = JSON.parse(localStorage.getItem(LS_KEY) || '{}');
+    el('target').value = s.target || ''; el('token').value = s.token || '';
     el('html').value = s.html || '';
-  } catch (e) {}
-  renderPreview();
-}
-function el(id) { return document.getElementById(id); }
-function log(msg, color) {
-  var L = el('log');
-  L.textContent = msg;
-  L.style.color = color || 'var(--dim)';
+  } catch(e){}
 }
 
-/* ============ preview ============ */
-function renderPreview() {
-  el('preview').innerHTML = el('html').value;
+/* ================= editor: highlight + preview ================= */
+var renderTimer = null;
+function onEdit(){
+  highlight(); schedulePreview(); saveState();
+  el('stat').textContent = el('html').value.length.toLocaleString() + ' chars';
+}
+function highlight(){
+  var code = el('html').value;
+  var esc = code.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  esc = esc.replace(/(&lt;!--[\s\S]*?--&gt;)/g, '<span class="c">$1</span>');
+  esc = esc.replace(/(&lt;\/?)([a-zA-Z][a-zA-Z0-9-]*)/g, '$1<span class="t">$2</span>');
+  esc = esc.replace(/([a-zA-Z-]+)(=)(&quot;[^&]*?&quot;|"[^"]*")/g,
+                     '<span class="a">$1</span><span class="p">$2</span><span class="s">$3</span>');
+  el('hl').innerHTML = esc + '\n';
+  el('hl').scrollTop = el('html').scrollTop;
+}
+function schedulePreview(){
+  clearTimeout(renderTimer);
+  renderTimer = setTimeout(applyPreview, 150);
+}
+var previewReady = false;
+function buildShell(){
+  return '<!DOCTYPE html><html><head>' +
+    '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Berkshire+Swash&family=Crimson+Text:ital,wght@0,400,0,600,0,700,1,400&family=Dancing+Script:wght@400;700&family=Fraunces:ital,wght@0,400,0,500,0,600,0,700,1,400&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Jura:wght@300;400;500;600;700&family=Lexend:wght@300;400;600;700&family=Monoton&family=Poppins:ital,wght@0,300,0,400,0,600,0,700,1,400&family=Press+Start+2P&family=Rock+Salt&family=VT323&display=swap">' +
+    '<link rel="stylesheet" href="jai.css">' +
+    '<style>html,body{background:#141018 !important;color:#e7e2ee !important;overflow-x:hidden !important;}' +
+    'img{max-width:100% !important;height:auto !important;}</style>' +
+    '</head><body></body></html>';
+}
+function applyPreview(){
+  var frame = el('preview');
+  var doc;
+  try { doc = frame.contentDocument; } catch(e){ return; }
+  if (!doc || !doc.body) { return; }
+  doc.body.innerHTML = el('html').value;
+}
+function initPreview(){
+  el('preview').onload = function(){
+    previewReady = true; applyPreview();
+  };
+  el('preview').srcdoc = buildShell();
 }
 
-/* ============ url / uuid ============ */
-function parseTarget() {
+/* ================= url / uuid ================= */
+function parseTarget(){
   var url = el('target').value.trim();
-  var mChar = /janitorai\.com\/characters\/([0-9a-f-]{36})/.exec(url);
-  if (mChar) return { kind: 'character', uuid: mChar[1] };
-  var mScript = /janitorai\.com\/scripts\/([0-9a-f-]{36})/.exec(url);
-  if (mScript) return { kind: 'script', uuid: mScript[1] };
+  var m = /janitorai\.com\/characters\/([0-9a-f-]{36})/.exec(url);
+  if (m) return { kind:'character', uuid:m[1] };
+  var s = /janitorai\.com\/scripts\/([0-9a-f-]{36})/.exec(url);
+  if (s) return { kind:'script', uuid:s[1] };
   return null;
 }
 
-/* ============ script generation (no relay — runs in JAI's own console) ============ */
-function escForScript(s) {
-  return s.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$\{/g, '\\${');
+/* ================= scripts (first-party publish) ================= */
+function escForScript(s){
+  return s.replace(/\\/g,'\\\\').replace(/`/g,'\\`').replace(/\$\{/g,'\\${');
 }
-
-function buildLoadScript() {
+function showScript(title, script, note){
+  el('scriptTitle').textContent = title;
+  el('scriptBody').textContent = script;
+  el('scriptNote').textContent = note || '';
+  el('scriptDlg').dataset.clip = script;
+  dlg('scriptDlg');
+}
+function copyScript(){
+  var s = el('scriptDlg').dataset.clip;
+  navigator.clipboard.writeText(s).then(function(){
+    toast('Script copied — paste into the JAI console (F12 on janitorai.com).', 'ok');
+  });
+}
+function loadCurrent(){
   var t = parseTarget();
-  if (!t) { log('Target URL does not contain a character or script UUID.', 'var(--bad)'); return null; }
-  if (!el('token').value.trim()) { log('Paste your access token first.', 'var(--bad)'); return null; }
+  if (!t) { toast('Target URL has no character/script UUID.', 'error'); return; }
+  if (!el('token').value.trim()) { toast('Paste your access token first.', 'error'); return; }
   var path = t.kind === 'character'
     ? '/hampter/characters/' + t.uuid
     : '/hampter/script/' + t.uuid + '/content?type=published';
-  return [
+  var script = [
     '(async () => {',
     '  try {',
     '    const response = await fetch("https://janitorai.com' + path + '", {',
-    '      method: "GET",',
-    '      credentials: "include",',
+    '      method: "GET", credentials: "include",',
     '      headers: { "content-type": "application/json", "authorization": "Bearer ' + el('token').value.trim() + '" }',
     '    });',
     '    const data = await response.json();',
     '    const content = ' + (t.kind === 'character' ? 'data.description' : 'data.content') + ';',
     '    if (typeof content === "string") {',
-    '      document.title = "FORGE-RESULT";',
-    '      window.__forgeResult = content;',
-    '      console.log("=== FORGE: CURRENT BIO ===");',
+    '      console.log("=== FORGE: CURRENT BIO (copy between markers) ===");',
     '      console.log(content);',
-    '      console.log("=== END (copy everything between the markers) ===");',
-    '    } else { console.log("FORGE: no content found"); }',
+    '      console.log("=== END FORGE ===");',
+    '    } else console.log("FORGE: no content found");',
     '  } catch (e) { console.error("FORGE failed:", e); }',
     '})();'
   ].join('\n');
+  showScript('Load Current Bio', script,
+    'Run on any janitorai.com tab (F12 → Console). Your current bio prints between the FORGE markers — copy it back into the editor here.');
 }
-
-function buildPublishScript() {
+function publish(){
   var t = parseTarget();
-  if (!t) { log('Target URL does not contain a character or script UUID.', 'var(--bad)'); return null; }
-  if (!el('token').value.trim()) { log('Paste your access token first.', 'var(--bad)'); return null; }
-  if (!el('html').value.trim()) { log('Nothing to publish — the HTML field is empty.', 'var(--bad)'); return null; }
+  if (!t) { toast('Target URL has no character/script UUID.', 'error'); return; }
+  if (!el('token').value.trim()) { toast('Paste your access token first.', 'error'); return; }
+  if (!el('html').value.trim()) { toast('Nothing to publish — editor is empty.', 'error'); return; }
   var html = el('html').value;
-  if (/z-index/i.test(html)) { log('HTML contains z-index — remove it before publishing.', 'var(--bad)'); return null; }
-
-  var path = t.kind === 'character'
-    ? '/mb/characters/' + t.uuid
-    : '/hampter/script/' + t.uuid + '/content';
+  if (/z-index/i.test(html)) { toast('HTML contains z-index — the server strips it badly. Remove it.', 'error'); return; }
+  var path = t.kind === 'character' ? '/mb/characters/' + t.uuid : '/hampter/script/' + t.uuid + '/content';
   var method = t.kind === 'character' ? 'PATCH' : 'PUT';
-  var bodyKey = t.kind === 'character' ? 'description' : 'content';
-
-  return [
+  var bodyInner = t.kind === 'character'
+    ? 'description: `' + escForScript(html) + '`'
+    : 'type: "published", content: `' + escForScript(html) + '`';
+  var script = [
     '(async () => {',
     '  try {',
     '    const response = await fetch("https://janitorai.com' + path + '", {',
-    '      method: "' + method + '",',
-    '      credentials: "include",',
+    '      method: "' + method + '", credentials: "include",',
     '      headers: { "content-type": "application/json", "authorization": "Bearer ' + el('token').value.trim() + '" },',
-    '      body: JSON.stringify({ ' + (t.kind === 'character' ? 'description' : 'type: "published", content') + ': `' + escForScript(html) + '` })',
+    '      body: JSON.stringify({ ' + bodyInner + ' })',
     '    });',
-    '    if (response.ok) { console.log("FORGE: Published successfully. Check the bot page."); }',
-    '    else { console.error("FORGE: rejected", response.status, await response.text()); }',
+    '    if (response.ok) console.log("FORGE: Published successfully. Check the bot page.");',
+    '    else console.error("FORGE: rejected", response.status, await response.text());',
     '  } catch (e) { console.error("FORGE failed:", e); }',
     '})();'
   ].join('\n');
+  showScript('Publish', script,
+    'Run on any janitorai.com tab (F12 → Console). The publish runs first-party — no relay, nothing between you and the API. Watch the console for the verdict.');
 }
 
-/* ============ actions ============ */
-function loadCurrent() {
-  var script = buildLoadScript();
-  if (!script) return;
-  showScriptModal('Load Current Bio — paste this in the JAI console', script,
-    'Run this on any janitorai.com tab (F12 → Console). Your current bio prints between the FORGE markers — copy it back into the HTML field here.');
-}
-function publish() {
-  var script = buildPublishScript();
-  if (!script) return;
-  showScriptModal('Publish — paste this in the JAI console', script,
-    'Run this on any janitorai.com tab (F12 → Console). The publish happens from inside JAI — first-party, no relay, nothing between you and the API. Watch the console for the result.');
-}
-
-/* ============ lint ============ */
-function lint() {
+/* ================= lint ================= */
+function lint(){
   var html = el('html').value;
   var problems = [];
-  if (/<style[\s>]/i.test(html)) problems.push('Contains <style> tag — server will strip it entirely.');
-  if (/<script[\s>]/i.test(html)) problems.push('Contains <script> tag — server will strip it entirely.');
-  if (/position\s*:/i.test(html)) problems.push('Contains position: — server strips it (all values).');
-  if (/z-index/i.test(html)) problems.push('Contains z-index — the server strips it badly, mangling nearby text. Remove the word entirely.');
-  if (/width\s*:\s*100vw/i.test(html)) problems.push('width: 100vw will overflow the page container — bad manners.');
-  if (problems.length === 0) {
-    log('Lint clean: no known server-blocked constructs found. Publish away.', 'var(--ok)');
-  } else {
-    log('Lint found ' + problems.length + ' issue(s):\n• ' + problems.join('\n• '), 'var(--bad)');
+  if (/<style[\s>]/i.test(html)) problems.push('<style> tag — server strips it entirely.');
+  if (/<script[\s>]/i.test(html)) problems.push('<script> tag — server strips it entirely.');
+  if (/position\s*:/i.test(html)) problems.push('position: — stripped (all values).');
+  if (/z-index/i.test(html)) problems.push('z-index — stripped badly, mangles nearby text.');
+  if (/width\s*:\s*100vw/i.test(html)) problems.push('width:100vw — overflows the page container. Bad manners.');
+  if (/height\s*:\s*100vh/i.test(html)) problems.push('height:100vh — overflows. Keep heights content-driven.');
+  var opens = (html.match(/<div/g)||[]).length, closes = (html.match(/<\/div>/g)||[]).length;
+  if (opens !== closes) problems.push('Unbalanced <div> tags: ' + opens + ' open, ' + closes + ' close.');
+  var pOpens = (html.match(/<p[\s>]/g)||[]).length, pCloses = (html.match(/<\/p>/g)||[]).length;
+  if (pOpens !== pCloses) problems.push('Unbalanced <p> tags: ' + pOpens + ' open, ' + pCloses + ' close.');
+  if (html.indexOf('`') !== -1) problems.push('Backticks present — they break the publish script. Remove them.');
+  if (problems.length === 0) toast('Lint clean — no blocked constructs, tags balanced, manners good. Publish away.', 'ok');
+  else toast('Lint found ' + problems.length + ' issue(s):', 'error', problems.join('\n'), true);
+}
+
+/* ================= format ================= */
+var VOID = new Set(['area','base','br','col','embed','hr','img','input','link','meta','param','source','track','wbr']);
+var KEEP = new Set(['pre','textarea']);
+function formatHtml(){
+  var html = el('html').value;
+  if (!html.trim()) return;
+  var out = [], indent = 0, pos = 0;
+  var re = /<!--[\s\S]*?-->|<\/?[a-zA-Z][^>]*?(?:"[^"]*"|'[^']*'|[^>"'])*>/g;
+  var m;
+  var pad = function(n){ return '  '.repeat(n); };
+  while ((m = re.exec(html)) !== null) {
+    var text = html.slice(pos, m.index).trim();
+    if (text) out.push(pad(indent) + text.replace(/\s+/g,' '));
+    var tok = m[0];
+    pos = re.lastIndex;
+    if (tok.startsWith('<!--')) { out.push(pad(indent) + tok); continue; }
+    var closing = tok.startsWith('</');
+    var nameM = /^<\/?([a-zA-Z][a-zA-Z0-9-]*)/.exec(tok);
+    var name = nameM ? nameM[1].toLowerCase() : '';
+    if (closing) { indent = Math.max(0, indent-1); out.push(pad(indent) + tok); continue; }
+    var selfClose = /\/>\s*$/.test(tok) || VOID.has(name);
+    if (!selfClose && !KEEP.has(name)) {
+      var rest = html.slice(pos);
+      var leaf = new RegExp('^([^<]*?)</' + name + '\\s*>','i').exec(rest);
+      if (leaf && leaf[1].trim()) {
+        out.push(pad(indent) + tok + leaf[1].replace(/\s+/g,' ').trim() + '</' + name + '>');
+        pos += leaf[0].length; re.lastIndex = pos;
+        continue;
+      }
+    }
+    out.push(pad(indent) + tok);
+    if (!selfClose) indent++;
   }
+  var tail = html.slice(pos).trim();
+  if (tail) out.push(pad(indent) + tail.replace(/\s+/g,' '));
+  el('html').value = out.join('\n');
+  onEdit();
+  toast('Formatted — indentation rebuilt, leaf elements folded.', 'ok');
 }
 
-/* ============ example ============ */
-function loadExample() {
-  el('html').value =
-    '<div style="background:linear-gradient(135deg, rgb(24,22,32), rgb(18,16,24)); border:1px solid rgb(70,80,110); border-radius:8px; padding:24px; text-align:center;">\n' +
-    '  <span style="font-family:Fraunces,serif; font-size:2.4rem; color:rgb(214,228,250); font-style:italic; font-weight:700; text-shadow:0 0 25px rgba(154,176,210,0.4);">The Blushing Blade</span><br>\n' +
-    '  <span style="font-family:Jura,sans-serif; font-size:0.8rem; letter-spacing:0.3em; color:rgb(212,175,85);">OF HOUSE ALDERMOOR</span>\n' +
-    '  <p style="display:flex; justify-content:center; gap:0.6rem; flex-wrap:wrap; margin:18px 0 0 0;">\n' +
-    '    <span style="background:rgba(154,176,210,0.1); color:rgb(214,228,250); border:1px solid rgba(154,176,210,0.4); border-radius:999px; padding:0.35rem 1rem; font-family:Jura,sans-serif; font-size:0.75rem;">THE BLADE</span>\n' +
-    '    <span style="background:rgba(212,175,85,0.1); color:rgb(232,205,140); border:1px solid rgba(212,175,85,0.4); border-radius:999px; padding:0.35rem 1rem; font-family:Jura,sans-serif; font-size:0.75rem;">THE SECRET</span>\n' +
-    '    <span style="background:rgba(235,130,110,0.1); color:rgb(245,160,145); border:1px solid rgba(235,130,110,0.4); border-radius:999px; padding:0.35rem 1rem; font-family:Jura,sans-serif; font-size:0.75rem;">THE BLUSH</span>\n' +
-    '  </p>\n' +
-    '</div>';
-  renderPreview(); saveState();
-  log('Example loaded — the API-legal grammar: divs, flex, gradients, pills, shadows.');
+/* ================= templates ================= */
+var TEMPLATES = {
+  gothic: [
+    '<div style="background:linear-gradient(160deg, rgb(24,22,32) 0%, rgb(16,14,22) 100%); border:1px solid rgb(70,80,110); box-shadow:0 0 40px rgba(80,100,150,0.15), inset 0 0 60px rgba(80,100,150,0.07); border-radius:4px; padding:36px 44px; max-width:640px; margin:0 auto;">',
+    '',
+    '  <p style="text-align:center; margin:0;">',
+    '    <span style="font-size:0.68rem; letter-spacing:0.45em; color:rgb(212,175,85); text-transform:uppercase;">❦ THE ANNALS PRESENT ❦</span>',
+    '  </p>',
+    '',
+    '  <p style="text-align:center; margin:10px 0 0 0;">',
+    '    <span style="font-size:2.1rem; font-weight:bold; color:rgb(214,228,250); font-family:Fraunces, serif; font-style:italic; letter-spacing:0.02em;">THE BLUSHING BLADE</span>',
+    '  </p>',
+    '',
+    '  <p style="text-align:center; margin:6px 0 0 0;">',
+    '    <span style="font-size:0.82rem; letter-spacing:0.3em; color:rgb(154,176,210); text-transform:uppercase; font-family:Jura, sans-serif;">OF HOUSE ALDERMOOR</span>',
+    '  </p>',
+    '',
+    '  <p style="display:flex; justify-content:center; gap:0.6rem; flex-wrap:wrap; margin:22px 0 0 0;">',
+    '    <span style="background:rgba(154,176,210,0.12); border:1px solid rgb(90,105,140); border-radius:999px; padding:5px 16px; font-size:0.75rem; letter-spacing:0.15em; color:rgb(214,228,250); font-family:Jura, sans-serif;">THE BLADE</span>',
+    '    <span style="background:rgba(212,175,85,0.12); border:1px solid rgb(160,130,70); border-radius:999px; padding:5px 16px; font-size:0.75rem; letter-spacing:0.15em; color:rgb(232,205,140); font-family:Jura, sans-serif;">THE SECRET</span>',
+    '    <span style="background:rgba(235,130,110,0.12); border:1px solid rgb(160,95,85); border-radius:999px; padding:5px 16px; font-size:0.75rem; letter-spacing:0.15em; color:rgb(245,160,145); font-family:Jura, sans-serif;">THE BLUSH</span>',
+    '  </p>',
+    '',
+    '</div>'
+  ].join('\n'),
+  house: [
+    '<p style="text-align:center;" class="_characterInfoShinyBox_1yi4w_265">',
+    '  <span style="font-size:1.7rem; color:rgb(120,215,200);"><strong><em>Your hook line goes here.</em></strong></span>',
+    '</p>',
+    '<p style="text-align:center;">',
+    '  <img src="IMAGE_URL" width="520">',
+    '</p>',
+    '<p style="text-align:center;" class="_characterInfoShinyBox_1yi4w_265">',
+    '  <span style="font-size:0.78rem; color:rgb(185,179,173);"><strong><u>THE PREMISE</u></strong></span>',
+    '</p>'
+  ].join('\n'),
+  dossier: [
+    '<div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; max-width:720px; margin:0 auto;">',
+    '  <div style="background:rgba(154,176,210,0.08); border:1px solid rgba(154,176,210,0.3); border-top:4px solid rgb(154,176,210); border-radius:0.5rem; padding:1rem;">',
+    '    <span style="font-family:Fraunces,serif; font-size:1.4rem; color:rgb(214,228,250); font-style:italic; font-weight:700;">Veronica</span><br>',
+    '    <span style="font-family:Jura,sans-serif; font-size:0.72rem; color:rgb(212,175,85); letter-spacing:0.2em;">SPECIAL RANK #3 · SORCERY</span>',
+    '    <p style="font-family:Inter,sans-serif; font-size:0.85rem; color:rgb(180,175,185); line-height:1.7; margin:10px 0 0 0;">Stat line. Stat line. Stat line.</p>',
+    '  </div>',
+    '  <div style="background:rgba(212,175,85,0.08); border:1px solid rgba(212,175,85,0.3); border-top:4px solid rgb(212,175,85); border-radius:0.5rem; padding:1rem;">',
+    '    <span style="font-family:Fraunces,serif; font-size:1.4rem; color:rgb(232,205,140); font-style:italic; font-weight:700;">Nyx</span><br>',
+    '    <span style="font-family:Jura,sans-serif; font-size:0.72rem; color:rgb(212,175,85); letter-spacing:0.2em;">COMBAT RANK #2 · ELECTROMANCY</span>',
+    '    <p style="font-family:Inter,sans-serif; font-size:0.85rem; color:rgb(180,175,185); line-height:1.7; margin:10px 0 0 0;">Stat line. Stat line. Stat line.</p>',
+    '  </div>',
+    '</div>'
+  ].join('\n'),
+  blank: [
+    '<div style="max-width:640px; margin:0 auto; background:rgb(24,22,32); border:1px solid rgb(60,52,84); border-radius:8px; padding:24px;">',
+    '  <p style="text-align:center; margin:0;">',
+    '    <span style="font-family:Fraunces,serif; font-size:1.8rem; color:rgb(232,226,222); font-style:italic;">Title</span>',
+    '  </p>',
+    '</div>'
+  ].join('\n')
+};
+function loadTemplate(name){
+  if (el('html').value.trim() && !confirm('Replace current HTML with this template?')) return;
+  el('html').value = TEMPLATES[name];
+  onEdit();
+  closeDlg('tplDlg');
+  toast('Template loaded — the API-legal grammar, ready to build on.', 'ok');
 }
 
-function clearAll() {
-  el('html').value = ''; el('target').value = ''; el('token').value = '';
-  renderPreview(); saveState(); log('cleared.');
-}
-
-/* ============ script modal ============ */
-function showScriptModal(title, script, note) {
-  el('scriptTitle').textContent = title;
-  el('scriptBody').textContent = script;
-  el('scriptNote').textContent = note || '';
-  el('scriptModal').classList.add('open');
-  el('scriptModal').dataset.clipboard = script;
-}
-function closeScriptModal() { el('scriptModal').classList.remove('open'); }
-function copyScriptModal() {
-  var s = el('scriptModal').dataset.clipboard;
-  navigator.clipboard.writeText(s).then(function () {
-    log('Script copied — paste it into the JAI console (F12 on janitorai.com).', 'var(--ok)');
+/* ================= file load ================= */
+el('fileInput').addEventListener('change', function(e){
+  var f = e.target.files && e.target.files[0];
+  if (!f) return;
+  f.text().then(function(txt){
+    el('html').value = txt; onEdit();
+    toast('Loaded ' + f.name, 'ok');
   });
-}
+  e.target.value = '';
+});
 
-/* ============ token modal ============ */
+/* ================= token modal ================= */
 var TOKEN_SCRIPT = [
   '(() => {',
   '  function getCookie(name) {',
@@ -344,16 +562,69 @@ var TOKEN_SCRIPT = [
   '})();'
 ].join('\n');
 el('tokenScript').textContent = TOKEN_SCRIPT;
-function openToken() { el('tokenModal').classList.add('open'); }
-function closeToken() { el('tokenModal').classList.remove('open'); }
-function copyTokenScript() {
-  navigator.clipboard.writeText(TOKEN_SCRIPT).then(function () {
-    log('Token script copied — paste it in the JAI console (F12).', 'var(--ok)');
+function copyTokenScript(){
+  navigator.clipboard.writeText(TOKEN_SCRIPT).then(function(){
+    toast('Token script copied — paste in the JAI console (F12).', 'ok');
   });
 }
 
-/* ============ boot ============ */
+/* ================= editor wiring ================= */
+el('html').addEventListener('input', onEdit);
+el('html').addEventListener('scroll', function(){
+  el('hl').scrollTop = el('html').scrollTop;
+  el('hl').scrollLeft = el('html').scrollLeft;
+});
+el('html').addEventListener('keydown', function(e){
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    var s = el('html').selectionStart, t = el('html').selectionEnd;
+    el('html').setRangeText('  ', s, t, 'end');
+    onEdit();
+  }
+});
+function clearAll(){
+  el('html').value = ''; el('target').value = ''; el('token').value = '';
+  onEdit(); toast('Cleared.');
+}
+
+/* ================= ember ambience ================= */
+(function(){
+  var c = el('emberCanvas'), ctx = c.getContext('2d');
+  var sparks = [];
+  function resize(){ c.width = innerWidth; c.height = innerHeight; }
+  addEventListener('resize', resize); resize();
+  function spawn(){
+    sparks.push({
+      x: Math.random()*c.width,
+      y: c.height + 10,
+      vx: (Math.random()-0.5)*0.3,
+      vy: -(0.3 + Math.random()*0.7),
+      r: 0.6 + Math.random()*1.8,
+      a: 0.15 + Math.random()*0.4,
+      flicker: Math.random()*Math.PI*2
+    });
+  }
+  function tick(){
+    ctx.clearRect(0,0,c.width,c.height);
+    if (sparks.length < 60 && Math.random() < 0.3) spawn();
+    for (var i = sparks.length-1; i >= 0; i--) {
+      var s = sparks[i];
+      s.x += s.vx; s.y += s.vy;
+      s.flicker += 0.05;
+      var alpha = s.a * (0.6 + 0.4*Math.sin(s.flicker));
+      if (s.y < -20) { sparks.splice(i,1); continue; }
+      ctx.fillStyle = 'rgba(235,130,90,' + alpha + ')';
+      ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI*2); ctx.fill();
+    }
+    requestAnimationFrame(tick);
+  }
+  tick();
+})();
+
+/* ================= boot ================= */
 loadState();
+initPreview();
+onEdit();
 </script>
 </body>
 </html>
