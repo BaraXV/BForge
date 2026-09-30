@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JAI FORGE — workshop publisher</title>
+<style>
+  :root {
+    --bg: rgb(18,16,24); --panel: rgb(26,24,32); --edge: rgb(60,52,84);
+    --text: rgb(232,226,222); --dim: rgb(150,145,160);
+    --accent: rgb(120,90,180); --accent2: rgb(196,160,228);
+    --gold: rgb(212,175,85); --ok: rgb(140,200,140); --bad: rgb(235,98,98);
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text);
+         font-family:'Segoe UI', sans-serif; font-size:14px; }
+  header { padding:14px 20px; background:var(--panel);
+           border-bottom:1px solid var(--edge);
+           display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+  header h1 { margin:0; font-size:18px; color:var(--accent2);
+              letter-spacing:0.08em; font-weight:600; }
+  header .tag { color:var(--dim); font-size:12px; }
+  header .spacer { flex:1; }
+  .wrap { padding:16px 20px; max-width:1400px; margin:0 auto; }
+  .row { display:flex; gap:14px; flex-wrap:wrap; margin-bottom:14px; align-items:flex-end; }
+  .field { display:flex; flex-direction:column; gap:4px; }
+  .field label { font-size:11px; color:var(--dim); letter-spacing:0.08em; text-transform:uppercase; }
+  .field input { background:var(--bg); color:var(--text); border:1px solid var(--edge);
+                 border-radius:6px; padding:8px 10px; font-size:13px; width:420px; max-width:90vw;
+                 font-family:monospace; }
+  .field input.small { width:340px; }
+  button { background:var(--accent); color:#fff; border:none; border-radius:6px;
+           padding:8px 14px; font-size:13px; cursor:pointer; font-family:inherit; }
+  button:hover { filter:brightness(1.15); }
+  button.ghost { background:transparent; border:1px solid var(--edge); color:var(--dim); }
+  button.gold { background:var(--gold); color:rgb(24,20,10); font-weight:600; }
+  .cols { display:flex; gap:14px; flex-wrap:wrap; }
+  .col { flex:1; min-width:320px; }
+  .col h2 { margin:0 0 8px 0; font-size:12px; color:var(--dim);
+            letter-spacing:0.12em; text-transform:uppercase; }
+  textarea { width:100%; height:460px; background:var(--bg); color:var(--text);
+             border:1px solid var(--edge); border-radius:6px; padding:10px;
+             font-family:Consolas, monospace; font-size:12px; line-height:1.5;
+             resize:vertical; }
+  #preview { height:460px; overflow:auto; background:#fff; border:1px solid var(--edge);
+             border-radius:6px; padding:10px; }
+  #log { margin-top:14px; background:var(--panel); border:1px solid var(--edge);
+         border-radius:6px; padding:10px 14px; font-family:monospace; font-size:12px;
+         color:var(--dim); white-space:pre-wrap; max-height:200px; overflow:auto; }
+  .modal { position:fixed; inset:0; background:rgba(0,0,0,0.7); display:none;
+           align-items:center; justify-content:center; z-index:99; }
+  .modal.open { display:flex; }
+  .modal .box { background:var(--panel); border:1px solid var(--edge); border-radius:10px;
+                padding:20px; max-width:640px; width:92vw; max-height:86vh; overflow:auto; }
+  .modal h3 { margin:0 0 10px 0; color:var(--accent2); font-size:15px; }
+  .modal pre { background:var(--bg); border:1px solid var(--edge); border-radius:6px;
+               padding:10px; font-size:11px; overflow:auto; max-height:200px; color:var(--gold); }
+  .modal ol { color:var(--dim); line-height:1.7; padding-left:20px; }
+  .note { font-size:11px; color:var(--dim); margin-top:6px; line-height:1.5; }
+</style>
+</head>
+<body>
+<header>
+  <h1>⬡ JAI FORGE</h1>
+  <span class="tag">workshop publisher · v0.1 · your token never leaves this browser</span>
+  <span class="spacer"></span>
+  <button class="ghost" onclick="openToken()">Get Access Token</button>
+</header>
+
+<div class="wrap">
+
+  <div class="row">
+    <div class="field">
+      <label>Target URL (character or script page)</label>
+      <input id="target" class="small" placeholder="https://janitorai.com/characters/UUID_name..."
+             oninput="saveState()">
+    </div>
+    <div class="field">
+      <label>Access Token</label>
+      <input id="token" type="password" placeholder="paste token from Get Access Token"
+             oninput="saveState()">
+    </div>
+    <button onclick="loadCurrent()">Load Current Bio</button>
+  </div>
+
+  <div class="cols">
+    <div class="col">
+      <h2>HTML Source</h2>
+      <textarea id="html" oninput="renderPreview(); saveState()"
+        placeholder="Paste your bio HTML here..."></textarea>
+      <div class="note">Publishing sends exactly this HTML through JAI's API. The server strips only &lt;style&gt;, &lt;script&gt;, position, and z-index — everything else renders.</div>
+    </div>
+    <div class="col">
+      <h2>Live Preview</h2>
+      <div id="preview"></div>
+    </div>
+  </div>
+
+  <div class="row" style="margin-top:14px">
+    <button class="ghost" onclick="loadExample()">Load Example</button>
+    <button class="ghost" onclick="lint()">Lint Check</button>
+    <button class="ghost" onclick="clearAll()">Clear</button>
+    <span class="spacer"></span>
+    <button class="gold" onclick="publish()">⚡ Publish to JAI</button>
+  </div>
+
+  <div id="log">ready.</div>
+</div>
+
+<div class="modal" id="tokenModal">
+  <div class="box">
+    <h3>Get your access token</h3>
+    <ol>
+      <li>Copy the script below.</li>
+      <li>Open <strong>janitorai.com</strong> in a browser tab and make sure you're logged in.</li>
+      <li>Press <strong>F12</strong> → Console tab → paste the script → Enter.</li>
+      <li>Your token prints below the command. Copy it into the token field here.</li>
+    </ol>
+    <pre id="tokenScript"></pre>
+    <button onclick="copyTokenScript()">Copy Script</button>
+    <button class="ghost" onclick="closeToken()">Close</button>
+    <div class="note">The script only reads your own session cookie, in your own browser, and prints it. Nothing is sent anywhere.</div>
+  </div>
+</div>
+
+<script>
+/* ============ state ============ */
+var LS_KEY = 'jai-forge-state';
+function saveState() {
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify({
+      target: el('target').value, token: el('token').value, html: el('html').value
+    }));
+  } catch (e) {}
+}
+function loadState() {
+  try {
+    var s = JSON.parse(localStorage.getItem(LS_KEY) || '{}');
+    el('target').value = s.target || '';
+    el('token').value = s.token || '';
+    el('html').value = s.html || '';
+  } catch (e) {}
+  renderPreview();
+}
+function el(id) { return document.getElementById(id); }
+function log(msg, color) {
+  var L = el('log');
+  L.textContent = msg;
+  L.style.color = color || 'var(--dim)';
+}
+
+/* ============ preview ============ */
+function renderPreview() {
+  el('preview').innerHTML = el('html').value;
+}
+
+/* ============ url / uuid ============ */
+function parseTarget() {
+  var url = el('target').value.trim();
+  var mChar = /janitorai\.com\/characters\/([0-9a-f-]{36})/.exec(url);
+  if (mChar) return { kind: 'character', uuid: mChar[1] };
+  var mScript = /janitorai\.com\/scripts\/([0-9a-f-]{36})/.exec(url);
+  if (mScript) return { kind: 'script', uuid: mScript[1] };
+  return null;
+}
+
+/* ============ network ============ */
+async function apiFetch(path, options) {
+  // relay through a CORS proxy: allorigins passes methods/headers through
+  var proxy = 'https://api.allorigins.win/raw?url=';
+  var url = 'https://janitorai.com' + path;
+  var res = await fetch(proxy + encodeURIComponent(url), {
+    method: options.method || 'GET',
+    headers: options.headers || {},
+    body: options.body || undefined
+  });
+  return res;
+}
+
+async function loadCurrent() {
+  var t = parseTarget();
+  if (!t) { log('Target URL does not contain a character or script UUID.', 'var(--bad)'); return; }
+  if (!el('token').value.trim()) { log('Paste your access token first (Get Access Token).', 'var(--bad)'); return; }
+  log('Loading current bio...');
+  try {
+    var path = t.kind === 'character'
+      ? '/hampter/characters/' + t.uuid
+      : '/hampter/script/' + t.uuid + '/content?type=published';
+    var res = await apiFetch(path, {
+      method: 'GET',
+      headers: { 'content-type': 'application/json',
+                 'authorization': 'Bearer ' + el('token').value.trim() }
+    });
+    if (!res.ok) { log('JAI answered ' + res.status + ' — check token/URL.', 'var(--bad)'); return; }
+    var data = await res.json();
+    var content = t.kind === 'character' ? data.description : data.content;
+    if (typeof content === 'string') {
+      el('html').value = content;
+      renderPreview(); saveState();
+      log('Loaded current bio (' + content.length + ' chars).', 'var(--ok)');
+    } else {
+      log('No bio content found on that target.', 'var(--bad)');
+    }
+  } catch (e) { log('Request failed: ' + e.message, 'var(--bad)'); }
+}
+
+async function publish() {
+  var t = parseTarget();
+  if (!t) { log('Target URL does not contain a character or script UUID.', 'var(--bad)'); return; }
+  if (!el('token').value.trim()) { log('Paste your access token first.', 'var(--bad)'); return; }
+  if (!el('html').value.trim()) { log('Nothing to publish — the HTML field is empty.', 'var(--bad)'); return; }
+
+  var html = el('html').value;
+  if (html.indexOf('`') !== -1) {
+    log('Your HTML contains backticks — remove them before publishing.', 'var(--bad)');
+    return;
+  }
+
+  var body = t.kind === 'character'
+    ? JSON.stringify({ description: html })
+    : JSON.stringify({ type: 'published', content: html });
+
+  log('Publishing to ' + t.kind + ' ' + t.uuid + '...');
+  try {
+    var path = t.kind === 'character'
+      ? '/mb/characters/' + t.uuid
+      : '/hampter/script/' + t.uuid + '/content';
+    var res = await apiFetch(path, {
+      method: t.kind === 'character' ? 'PATCH' : 'PUT',
+      headers: { 'content-type': 'application/json',
+                 'authorization': 'Bearer ' + el('token').value.trim() },
+      body: body
+    });
+    if (res.ok) {
+      log('Published successfully. Open the bot page to verify.', 'var(--ok)');
+    } else {
+      var errText = await res.text();
+      log('JAI rejected the publish (' + res.status + '):\n' + errText.slice(0, 500), 'var(--bad)');
+    }
+  } catch (e) { log('Publish failed: ' + e.message, 'var(--bad)'); }
+}
+
+/* ============ lint ============ */
+function lint() {
+  var html = el('html').value;
+  var problems = [];
+  if (/<style[\s>]/i.test(html)) problems.push('Contains <style> tag — server will strip it entirely.');
+  if (/<script[\s>]/i.test(html)) problems.push('Contains <script> tag — server will strip it entirely.');
+  if (/position\s*:/i.test(html)) problems.push('Contains position: — server strips it (all values).');
+  if (/z-index/i.test(html)) problems.push('Contains z-index — the server strips it badly, mangling nearby text. Remove the word entirely.');
+  if (html.indexOf('`') !== -1) problems.push('Contains backticks — remove them before publish.');
+  if (/width\s*:\s*100vw/i.test(html)) problems.push('width: 100vw will overflow the page container — bad manners.');
+  if (problems.length === 0) {
+    log('Lint clean: no known server-blocked constructs found. Publish away.', 'var(--ok)');
+  } else {
+    log('Lint found ' + problems.length + ' issue(s):\n• ' + problems.join('\n• '), 'var(--bad)');
+  }
+}
+
+/* ============ example ============ */
+function loadExample() {
+  el('html').value =
+    '<div style="background:linear-gradient(135deg, rgb(24,22,32), rgb(18,16,24)); border:1px solid rgb(70,80,110); border-radius:8px; padding:24px; text-align:center;">\n' +
+    '  <span style="font-family:Fraunces,serif; font-size:2.4rem; color:rgb(214,228,250); font-style:italic; font-weight:700; text-shadow:0 0 25px rgba(154,176,210,0.4);">The Blushing Blade</span><br>\n' +
+    '  <span style="font-family:Jura,sans-serif; font-size:0.8rem; letter-spacing:0.3em; color:rgb(212,175,85);">OF HOUSE ALDERMOOR</span>\n' +
+    '  <p style="display:flex; justify-content:center; gap:0.6rem; flex-wrap:wrap; margin:18px 0 0 0;">\n' +
+    '    <span style="background:rgba(154,176,210,0.1); color:rgb(214,228,250); border:1px solid rgba(154,176,210,0.4); border-radius:999px; padding:0.35rem 1rem; font-family:Jura,sans-serif; font-size:0.75rem;">THE BLADE</span>\n' +
+    '    <span style="background:rgba(212,175,85,0.1); color:rgb(232,205,140); border:1px solid rgba(212,175,85,0.4); border-radius:999px; padding:0.35rem 1rem; font-family:Jura,sans-serif; font-size:0.75rem;">THE SECRET</span>\n' +
+    '    <span style="background:rgba(235,130,110,0.1); color:rgb(245,160,145); border:1px solid rgba(235,130,110,0.4); border-radius:999px; padding:0.35rem 1rem; font-family:Jura,sans-serif; font-size:0.75rem;">THE BLUSH</span>\n' +
+    '  </p>\n' +
+    '</div>';
+  renderPreview(); saveState();
+  log('Example loaded — the API-legal grammar: divs, flex, gradients, pills, shadows.');
+}
+
+function clearAll() {
+  el('html').value = ''; el('target').value = ''; el('token').value = '';
+  renderPreview(); saveState(); log('cleared.');
+}
+
+/* ============ token modal ============ */
+var TOKEN_SCRIPT = [
+  '(() => {',
+  '  function getCookie(name) {',
+  '    const value = `; ${document.cookie}`;',
+  '    const parts = value.split(`; ${name}=`);',
+  '    if (parts.length === 2) return parts.pop().split(";").shift();',
+  '    return null;',
+  '  }',
+  '  const cookieMatch = document.cookie.match(/(?:^|;\\s*)(sb-[^=]+-auth-token)(?:\\.\\d+)?=/);',
+  '  const baseName = cookieMatch ? cookieMatch[1] : "sb-auth-auth-token";',
+  '  let raw = getCookie(baseName);',
+  '  if (!raw) {',
+  '    const chunks = [];',
+  '    for (let i = 0; ; i++) {',
+  '      const chunk = getCookie(`${baseName}.${i}`);',
+  '      if (chunk === null) break;',
+  '      chunks.push(chunk);',
+  '    }',
+  '    if (chunks.length > 0) raw = chunks.join("");',
+  '  }',
+  '  if (!raw) { console.log("No token found"); return; }',
+  '  try {',
+  '    let jsonStr = "";',
+  '    if (raw.startsWith("base64-")) {',
+  '      let b64 = raw.slice(7).replace(/-/g, "+").replace(/_/g, "/");',
+  '      while (b64.length % 4) b64 += "=";',
+  '      const binary = atob(b64);',
+  '      const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));',
+  '      jsonStr = new TextDecoder().decode(bytes);',
+  '    } else {',
+  '      jsonStr = decodeURIComponent(raw);',
+  '    }',
+  '    const json = JSON.parse(jsonStr);',
+  '    if (json?.access_token) console.log(json.access_token);',
+  '    else console.log("No access token found");',
+  '  } catch (e) { console.error("Failed to parse token", e); }',
+  '})();'
+].join('\n');
+el('tokenScript').textContent = TOKEN_SCRIPT;
+function openToken() { el('tokenModal').classList.add('open'); }
+function closeToken() { el('tokenModal').classList.remove('open'); }
+function copyTokenScript() {
+  navigator.clipboard.writeText(TOKEN_SCRIPT).then(function () {
+    log('Token script copied — paste it in the JAI console (F12).', 'var(--ok)');
+  });
+}
+
+/* ============ boot ============ */
+loadState();
+</script>
+</body>
+</html>
