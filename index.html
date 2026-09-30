@@ -107,6 +107,15 @@
   <div id="log">ready.</div>
 </div>
 
+<div class="modal" id="scriptModal">
+  <div class="box">
+    <h3 id="scriptTitle">Script</h3>
+    <div class="note" id="scriptNote"></div>
+    <pre id="scriptBody"></pre>
+    <button onclick="copyScriptModal()">Copy Script</button>
+    <button class="ghost" onclick="closeScriptModal()">Close</button>
+  </div>
+</div>
 <div class="modal" id="tokenModal">
   <div class="box">
     <h3>Get your access token</h3>
@@ -164,80 +173,82 @@ function parseTarget() {
   return null;
 }
 
-/* ============ network ============ */
-async function apiFetch(path, options) {
-  // relay through a CORS proxy: allorigins passes methods/headers through
-  var proxy = 'https://api.allorigins.win/raw?url=';
-  var url = 'https://janitorai.com' + path;
-  var res = await fetch(proxy + encodeURIComponent(url), {
-    method: options.method || 'GET',
-    headers: options.headers || {},
-    body: options.body || undefined
-  });
-  return res;
+/* ============ script generation (no relay — runs in JAI's own console) ============ */
+function escForScript(s) {
+  return s.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$\{/g, '\\${');
 }
 
-async function loadCurrent() {
+function buildLoadScript() {
   var t = parseTarget();
-  if (!t) { log('Target URL does not contain a character or script UUID.', 'var(--bad)'); return; }
-  if (!el('token').value.trim()) { log('Paste your access token first (Get Access Token).', 'var(--bad)'); return; }
-  log('Loading current bio...');
-  try {
-    var path = t.kind === 'character'
-      ? '/hampter/characters/' + t.uuid
-      : '/hampter/script/' + t.uuid + '/content?type=published';
-    var res = await apiFetch(path, {
-      method: 'GET',
-      headers: { 'content-type': 'application/json',
-                 'authorization': 'Bearer ' + el('token').value.trim() }
-    });
-    if (!res.ok) { log('JAI answered ' + res.status + ' — check token/URL.', 'var(--bad)'); return; }
-    var data = await res.json();
-    var content = t.kind === 'character' ? data.description : data.content;
-    if (typeof content === 'string') {
-      el('html').value = content;
-      renderPreview(); saveState();
-      log('Loaded current bio (' + content.length + ' chars).', 'var(--ok)');
-    } else {
-      log('No bio content found on that target.', 'var(--bad)');
-    }
-  } catch (e) { log('Request failed: ' + e.message, 'var(--bad)'); }
+  if (!t) { log('Target URL does not contain a character or script UUID.', 'var(--bad)'); return null; }
+  if (!el('token').value.trim()) { log('Paste your access token first.', 'var(--bad)'); return null; }
+  var path = t.kind === 'character'
+    ? '/hampter/characters/' + t.uuid
+    : '/hampter/script/' + t.uuid + '/content?type=published';
+  return [
+    '(async () => {',
+    '  try {',
+    '    const response = await fetch("https://janitorai.com' + path + '", {',
+    '      method: "GET",',
+    '      credentials: "include",',
+    '      headers: { "content-type": "application/json", "authorization": "Bearer ' + el('token').value.trim() + '" }',
+    '    });',
+    '    const data = await response.json();',
+    '    const content = ' + (t.kind === 'character' ? 'data.description' : 'data.content') + ';',
+    '    if (typeof content === "string") {',
+    '      document.title = "FORGE-RESULT";',
+    '      window.__forgeResult = content;',
+    '      console.log("=== FORGE: CURRENT BIO ===");',
+    '      console.log(content);',
+    '      console.log("=== END (copy everything between the markers) ===");',
+    '    } else { console.log("FORGE: no content found"); }',
+    '  } catch (e) { console.error("FORGE failed:", e); }',
+    '})();'
+  ].join('\n');
 }
 
-async function publish() {
+function buildPublishScript() {
   var t = parseTarget();
-  if (!t) { log('Target URL does not contain a character or script UUID.', 'var(--bad)'); return; }
-  if (!el('token').value.trim()) { log('Paste your access token first.', 'var(--bad)'); return; }
-  if (!el('html').value.trim()) { log('Nothing to publish — the HTML field is empty.', 'var(--bad)'); return; }
-
+  if (!t) { log('Target URL does not contain a character or script UUID.', 'var(--bad)'); return null; }
+  if (!el('token').value.trim()) { log('Paste your access token first.', 'var(--bad)'); return null; }
+  if (!el('html').value.trim()) { log('Nothing to publish — the HTML field is empty.', 'var(--bad)'); return null; }
   var html = el('html').value;
-  if (html.indexOf('`') !== -1) {
-    log('Your HTML contains backticks — remove them before publishing.', 'var(--bad)');
-    return;
-  }
+  if (/z-index/i.test(html)) { log('HTML contains z-index — remove it before publishing.', 'var(--bad)'); return null; }
 
-  var body = t.kind === 'character'
-    ? JSON.stringify({ description: html })
-    : JSON.stringify({ type: 'published', content: html });
+  var path = t.kind === 'character'
+    ? '/mb/characters/' + t.uuid
+    : '/hampter/script/' + t.uuid + '/content';
+  var method = t.kind === 'character' ? 'PATCH' : 'PUT';
+  var bodyKey = t.kind === 'character' ? 'description' : 'content';
 
-  log('Publishing to ' + t.kind + ' ' + t.uuid + '...');
-  try {
-    var path = t.kind === 'character'
-      ? '/mb/characters/' + t.uuid
-      : '/hampter/script/' + t.uuid + '/content';
-    var res = await apiFetch(path, {
-      method: t.kind === 'character' ? 'PATCH' : 'PUT',
-      headers: { 'content-type': 'application/json',
-                 'authorization': 'Bearer ' + el('token').value.trim() },
-      body: body
-    });
-    if (res.ok) {
-      log('Published successfully. Open the bot page to verify.', 'var(--ok)');
-    } else {
-      var errText = await res.text();
-      log('JAI rejected the publish (' + res.status + '):\n' + errText.slice(0, 500), 'var(--bad)');
-    }
-  } catch (e) { log('Publish failed: ' + e.message, 'var(--bad)'); }
+  return [
+    '(async () => {',
+    '  try {',
+    '    const response = await fetch("https://janitorai.com' + path + '", {',
+    '      method: "' + method + '",',
+    '      credentials: "include",',
+    '      headers: { "content-type": "application/json", "authorization": "Bearer ' + el('token').value.trim() + '" },',
+    '      body: JSON.stringify({ ' + (t.kind === 'character' ? 'description' : 'type: "published", content') + ': `' + escForScript(html) + '` })',
+    '    });',
+    '    if (response.ok) { console.log("FORGE: Published successfully. Check the bot page."); }',
+    '    else { console.error("FORGE: rejected", response.status, await response.text()); }',
+    '  } catch (e) { console.error("FORGE failed:", e); }',
+    '})();'
+  ].join('\n');
+}
+
+/* ============ actions ============ */
+function loadCurrent() {
+  var script = buildLoadScript();
+  if (!script) return;
+  showScriptModal('Load Current Bio — paste this in the JAI console', script,
+    'Run this on any janitorai.com tab (F12 → Console). Your current bio prints between the FORGE markers — copy it back into the HTML field here.');
+}
+function publish() {
+  var script = buildPublishScript();
+  if (!script) return;
+  showScriptModal('Publish — paste this in the JAI console', script,
+    'Run this on any janitorai.com tab (F12 → Console). The publish happens from inside JAI — first-party, no relay, nothing between you and the API. Watch the console for the result.');
 }
 
 /* ============ lint ============ */
@@ -248,7 +259,6 @@ function lint() {
   if (/<script[\s>]/i.test(html)) problems.push('Contains <script> tag — server will strip it entirely.');
   if (/position\s*:/i.test(html)) problems.push('Contains position: — server strips it (all values).');
   if (/z-index/i.test(html)) problems.push('Contains z-index — the server strips it badly, mangling nearby text. Remove the word entirely.');
-  if (html.indexOf('`') !== -1) problems.push('Contains backticks — remove them before publish.');
   if (/width\s*:\s*100vw/i.test(html)) problems.push('width: 100vw will overflow the page container — bad manners.');
   if (problems.length === 0) {
     log('Lint clean: no known server-blocked constructs found. Publish away.', 'var(--ok)');
@@ -276,6 +286,22 @@ function loadExample() {
 function clearAll() {
   el('html').value = ''; el('target').value = ''; el('token').value = '';
   renderPreview(); saveState(); log('cleared.');
+}
+
+/* ============ script modal ============ */
+function showScriptModal(title, script, note) {
+  el('scriptTitle').textContent = title;
+  el('scriptBody').textContent = script;
+  el('scriptNote').textContent = note || '';
+  el('scriptModal').classList.add('open');
+  el('scriptModal').dataset.clipboard = script;
+}
+function closeScriptModal() { el('scriptModal').classList.remove('open'); }
+function copyScriptModal() {
+  var s = el('scriptModal').dataset.clipboard;
+  navigator.clipboard.writeText(s).then(function () {
+    log('Script copied — paste it into the JAI console (F12 on janitorai.com).', 'var(--ok)');
+  });
 }
 
 /* ============ token modal ============ */
