@@ -131,7 +131,7 @@
     <button class="ghost" onclick="cmFormat()">Format (Ctrl+Shift+F)</button>
     <button class="ghost" onclick="lint()">Lint</button>
     <button class="ghost" onclick="loadCurrent()">Load Current</button>
-    <button class="ghost" onclick="cm.setValue('')">Clear Editor</button>
+    <button class="ghost" onclick="clearEditor()">Clear Editor</button>
     <span style="flex:1"></span>
     <button class="ember" onclick="publishClick()">⚡ Publish to JAI</button>
   </div>
@@ -196,24 +196,51 @@ function toast(msg, kind, detail, sticky){
 function dlg(id){ el(id).showModal(); }
 function closeDlg(id){ el(id).close(); }
 
-/* ============ state (fixed: never save empty over good) ============ */
-var LS_KEY = 'jai-forge-v4';
-var lastKnownGood = '';
-function saveState(){
-  var current = cm ? cm.getValue() : '';
-  if (!current.trim() && lastKnownGood.trim()) return;
-  lastKnownGood = current;
-  try { localStorage.setItem(LS_KEY, JSON.stringify({
-    target: val('target'), token: val('token'), html: current
-  })); } catch(e){}
+/* ============ THE VAULT — triple-redundant storage ============ */
+var LS_KEY   = 'jai-forge-html';   // primary
+var LS_BACKUP = 'jai-forge-html-backup'; // second copy
+var LS_META  = 'jai-forge-meta';   // target + token
+var lastGood = '';
+
+function vaultSave(html){
+  // Rule 1: never overwrite with empty unless the vault is already empty
+  if (!html.trim() && lastGood.trim()) return;
+  lastGood = html;
+  try {
+    localStorage.setItem(LS_KEY, html);
+    localStorage.setItem(LS_BACKUP, html);
+    localStorage.setItem(LS_META, JSON.stringify({
+      target: val('target'), token: val('token'), saved: Date.now()
+    }));
+  } catch(e){}
 }
-function loadState(){
-  try { var s = JSON.parse(localStorage.getItem(LS_KEY) || '{}');
-    el('target').value = s.target || '';
-    el('token').value = s.token || '';
-    return s.html || '';
-  } catch(e){ return ''; }
+
+function vaultLoad(){
+  // Rule 2: return whichever copy has content — never return empty if any copy has work
+  var primary = '', backup = '';
+  try { primary = localStorage.getItem(LS_KEY) || ''; } catch(e){}
+  try { backup  = localStorage.getItem(LS_BACKUP) || ''; } catch(e){}
+  var html = primary.trim() ? primary : backup.trim() ? backup : '';
+  // Rule 3: if primary died but backup has it, restore primary immediately
+  if (!primary.trim() && backup.trim()) {
+    try { localStorage.setItem(LS_KEY, backup); } catch(e){}
+  }
+  try {
+    var meta = JSON.parse(localStorage.getItem(LS_META) || '{}');
+    el('target').value = meta.target || '';
+    el('token').value = meta.token || '';
+  } catch(e){}
+  lastGood = html;
+  return html;
 }
+
+/* Heartbeat: every 20 seconds, unconditionally re-save the current editor.
+   Whatever happened in between — teardown, race, glitch — the heartbeat
+   re-asserts the real content. A wipe would have to beat the heartbeat,
+   the change-saver, AND both vaults simultaneously. */
+setInterval(function(){
+  if (cm && cm.getValue().trim()) vaultSave(cm.getValue());
+}, 20000);
 
 /* ============ CodeMirror ============ */
 var cm = CodeMirror.fromTextArea(el('html'), {
@@ -227,15 +254,14 @@ var cm = CodeMirror.fromTextArea(el('html'), {
   tabSize: 2
 });
 var booting = true;
-var savedHtml = loadState();
+var savedHtml = vaultLoad();
 cm.setValue(savedHtml);
-lastKnownGood = savedHtml;
 booting = false;
 cm.on('change', function(){
   if (booting) return;
   el('stat').textContent = cm.getValue().length.toLocaleString() + ' chars';
   schedulePreview();
-  saveState();
+  vaultSave(cm.getValue());
 });
 cm.setOption('extraKeys', {
   'Ctrl-Shift-F': function(){ cmFormat(); },
@@ -293,7 +319,7 @@ async function publishClick(){
     else toast('JAI rejected the publish (' + data.status + ').', 'error',
       JSON.stringify(data.response || data.error || data).slice(0, 600), true);
   } catch (e) {
-    toast('Worker unreachable. Use the console-script fallback below.', 'error', e.message);
+    toast('Worker unreachable. Use the console-script fallback.', 'error', e.message);
     showConsoleScript();
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = old; }
@@ -422,7 +448,13 @@ function loadCurrent(){
     '  else console.log("FORGE: no content");',
     '})();'
   ].join('\n');
-  showScriptModal('Load Current Bio', 'Run on any janitorai.com tab. Copy the content between the markers, paste it back into the editor.', script);
+  showScriptModal('Load Current Bio', 'Run on any janitorai.com tab. Copy the content between the markers, paste into the editor.', script);
+}
+
+/* ============ clear — vault-aware ============ */
+function clearEditor(){
+  if (cm.getValue().trim() && !confirm('Clear the editor? (Saved work stays in the backup vault until you type something new.)')) return;
+  cm.setValue('');
 }
 
 /* ============ token ============ */
