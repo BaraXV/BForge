@@ -130,6 +130,7 @@
   <div class="row" style="margin-top:12px">
     <button class="ghost" onclick="cmFormat()">Format (Ctrl+Shift+F)</button>
     <button class="ghost" onclick="lint()">Lint</button>
+    <button class="ghost" onclick="refreshPreview()">↻ Refresh Preview</button>
     <button class="ghost" onclick="loadCurrent()">Load Current</button>
     <button class="ghost" onclick="clearEditor()">Clear Editor</button>
     <span style="flex:1"></span>
@@ -272,9 +273,10 @@ cm.setOption('extraKeys', {
 var renderTimer = null;
 function schedulePreview(){ clearTimeout(renderTimer); renderTimer = setTimeout(applyPreview, 200); }
 function buildShell(){
+  var nocache = Date.now();
   return '<!DOCTYPE html><html><head>' +
     '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Berkshire+Swash&family=Crimson+Text:ital,wght@0,400,0,600,0,700,1,400&family=Dancing+Script:wght@400;700&family=Fraunces:ital,wght@0,400,0,500,0,600,0,700,1,400&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Jura:wght@300;400;500;600;700&family=Lexend:wght@300;400;600;700&family=Monoton&family=Poppins:ital,wght@0,300,0,400,0,600,0,700,1,400&family=Press+Start+2P&family=Rock+Salt&family=VT323&display=swap">' +
-    '<link rel="stylesheet" href="jai.css">' +
+    '<link rel="stylesheet" href="jai.css?v=' + nocache + '">' +
     '<style>html,body{background:#141018 !important;color:#e7e2ee !important;overflow-x:hidden !important;}' +
     'img{max-width:100% !important;height:auto !important;}</style>' +
     '</head><body></body></html>';
@@ -499,6 +501,12 @@ function copyTokenScript(){
   navigator.clipboard.writeText(TOKEN_SCRIPT).then(function(){
     toast('Token script copied.', 'ok');
   });
+}
+
+function refreshPreview(){
+  el('preview').onload = function(){ applyPreview(); };
+  el('preview').srcdoc = buildShell();
+  toast('Preview reloaded fresh.', 'ok');
 }
 
 /* ============ boot ============ */
