@@ -196,19 +196,26 @@ function toast(msg, kind, detail, sticky){
 function dlg(id){ el(id).showModal(); }
 function closeDlg(id){ el(id).close(); }
 
-/* ============ state ============ */
+/* ============ state (fixed: never save empty over good) ============ */
+var LS_KEY = 'jai-forge-v4';
 var lastKnownGood = '';
 function saveState(){
   var current = cm ? cm.getValue() : '';
-  // never let a teardown/blank moment overwrite real work
   if (!current.trim() && lastKnownGood.trim()) return;
   lastKnownGood = current;
   try { localStorage.setItem(LS_KEY, JSON.stringify({
     target: val('target'), token: val('token'), html: current
   })); } catch(e){}
 }
+function loadState(){
+  try { var s = JSON.parse(localStorage.getItem(LS_KEY) || '{}');
+    el('target').value = s.target || '';
+    el('token').value = s.token || '';
+    return s.html || '';
+  } catch(e){ return ''; }
+}
 
-/* ============ CodeMirror init ============ */
+/* ============ CodeMirror ============ */
 var cm = CodeMirror.fromTextArea(el('html'), {
   mode: 'htmlmixed',
   theme: 'material-darker',
@@ -220,14 +227,15 @@ var cm = CodeMirror.fromTextArea(el('html'), {
   tabSize: 2
 });
 var booting = true;
-var saved = loadState();
-cm.setValue(saved);
-lastKnownGood = saved;
+var savedHtml = loadState();
+cm.setValue(savedHtml);
+lastKnownGood = savedHtml;
 booting = false;
 cm.on('change', function(){
   if (booting) return;
   el('stat').textContent = cm.getValue().length.toLocaleString() + ' chars';
-  schedulePreview(); saveState();
+  schedulePreview();
+  saveState();
 });
 cm.setOption('extraKeys', {
   'Ctrl-Shift-F': function(){ cmFormat(); },
@@ -285,15 +293,27 @@ async function publishClick(){
     else toast('JAI rejected the publish (' + data.status + ').', 'error',
       JSON.stringify(data.response || data.error || data).slice(0, 600), true);
   } catch (e) {
-    toast('Worker unreachable. Falling back to console-script method.', 'error', e.message);
+    toast('Worker unreachable. Use the console-script fallback below.', 'error', e.message);
     showConsoleScript();
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = old; }
   }
 }
 
-/* ============ console-script fallback ============ */
+/* ============ console fallback ============ */
 function escForScript(s){ return s.replace(/\\/g,'\\\\').replace(/`/g,'\\`').replace(/\$\{/g,'\\${'); }
+function showScriptModal(title, note, script){
+  el('scriptTitle').textContent = title;
+  el('scriptNote').textContent = note;
+  el('scriptBody').textContent = script;
+  el('scriptDlg').dataset.clip = script;
+  dlg('scriptDlg');
+}
+function copyScript(){
+  navigator.clipboard.writeText(el('scriptDlg').dataset.clip).then(function(){
+    toast('Copied — paste into JAI console (F12).', 'ok');
+  });
+}
 function showConsoleScript(){
   var t = parseTarget();
   if (!t) { toast('No target UUID.', 'error'); return; }
@@ -325,16 +345,7 @@ function showConsoleScript(){
       '})();'
     ].join('\n');
   }
-  el('scriptTitle').textContent = 'Console Script (fallback)';
-  el('scriptNote').textContent = 'Run on any janitorai.com tab (F12 → Console).';
-  el('scriptBody').textContent = script;
-  el('scriptDlg').dataset.clip = script;
-  dlg('scriptDlg');
-}
-function copyScript(){
-  navigator.clipboard.writeText(el('scriptDlg').dataset.clip).then(function(){
-    toast('Copied — paste into JAI console (F12).', 'ok');
-  });
+  showScriptModal('Console Script (fallback)', 'Run on any janitorai.com tab (F12 → Console).', script);
 }
 
 /* ============ lint ============ */
@@ -352,7 +363,7 @@ function lint(){
   else toast('Lint found ' + problems.length + ' issue(s):', 'error', problems.join('\n'), true);
 }
 
-/* ============ format — simple, structural, non-destructive ============ */
+/* ============ format ============ */
 var VOID = new Set(['area','base','br','col','embed','hr','img','input','link','meta','param','source','track','wbr']);
 function cmFormat(){
   var html = cm.getValue();
@@ -388,27 +399,14 @@ function cmFormat(){
   if (result === html) { toast('Already formatted.', 'ok'); return; }
   cm.setValue(result);
   cm.setCursor(cursor);
-  toast('Formatted. Folding arrows in the gutter collapse sections.', 'ok');
+  toast('Formatted.', 'ok');
 }
 
 /* ============ load current ============ */
-async function loadCurrent(){
+function loadCurrent(){
   var t = parseTarget();
   if (!t) { toast('Target URL has no UUID.', 'error'); return; }
   if (!val('token').trim()) { toast('Paste your token first.', 'error'); return; }
-  var btn = document.querySelector('button.ghost:nth-of-type(3)');
-  var old = btn ? btn.textContent : '';
-  if (btn) { btn.disabled = true; btn.textContent = 'Loading...'; }
-  try {
-    var WORKER_GET = WORKER_URL.replace('forge-publish', 'forge-reveal');
-    // direct GET via a small relay trick: reuse publish worker path is complex — use console script instead
-    showLoadScript();
-  } finally {
-    if (btn) { btn.disabled = false; if (btn) btn.textContent = old; }
-  }
-}
-function showLoadScript(){
-  var t = parseTarget();
   var path = t.kind === 'character'
     ? '/hampter/characters/' + t.uuid
     : '/hampter/script/' + t.uuid + '/content?type=published';
@@ -424,11 +422,7 @@ function showLoadScript(){
     '  else console.log("FORGE: no content");',
     '})();'
   ].join('\n');
-  el('scriptTitle').textContent = 'Load Current Bio';
-  el('scriptNote').textContent = 'Run on any janitorai.com tab. Copy the content between the markers, paste it back here.';
-  el('scriptBody').textContent = script;
-  el('scriptDlg').dataset.clip = script;
-  dlg('scriptDlg');
+  showScriptModal('Load Current Bio', 'Run on any janitorai.com tab. Copy the content between the markers, paste it back into the editor.', script);
 }
 
 /* ============ token ============ */
@@ -475,7 +469,7 @@ function copyTokenScript(){
   });
 }
 
-/* init stat */
+/* ============ boot ============ */
 el('stat').textContent = cm.getValue().length.toLocaleString() + ' chars';
 </script>
 </body>
