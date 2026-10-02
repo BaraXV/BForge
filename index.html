@@ -173,7 +173,7 @@
     <button class="ghost" onclick="loadCurrent()">Load Current Bio</button>
     <button class="ghost" onclick="clearAll()">Clear</button>
     <span class="spacer" style="flex:1"></span>
-    <button class="ember" onclick="publish()">⚡ Publish to JAI</button>
+    <button class="ember" onclick="publishClick()">⚡ Publish to JAI</button>
   </div>
 
   <!-- ======================= BUILDER PANE (hidden by default) ======================= -->
@@ -412,6 +412,32 @@ function loadCurrent(){
     '  } catch (e) { console.error("FORGE failed:", e); }',
     '})();'
   ].join('\n'), 'Run on any janitorai.com tab. Copy the bio between the markers back into the editor.');
+}
+async function publishClick(){
+  var t = parseTarget();
+  if (!t) { toast('Target URL has no character/script UUID.', 'error'); return; }
+  if (!val('token').trim()) { toast('Paste your access token first.', 'error'); return; }
+  if (!val('html').trim()) { toast('Nothing to publish — editor is empty.', 'error'); return; }
+  if (/z-index/i.test(val('html'))) { toast('HTML contains z-index — remove it first.', 'error'); return; }
+  var btn = document.querySelector('button.ember');
+  var old = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Publishing...'; }
+  try {
+    var res = await fetch('https://yellow-sun-0975.rainer-burner-15.workers.dev/', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ url: val('target').trim(), token: val('token').trim(), html: val('html') })
+    });
+    var data = await res.json();
+    if (data.ok) toast('Published to ' + data.target + '. Open the page to verify.', 'ok');
+    else toast('JAI rejected the publish (' + data.status + ').', 'error',
+      JSON.stringify(data.response || data.error).slice(0, 500), true);
+  } catch (e) {
+    toast('Relay unreachable — did you deploy forge-publish? Falling back to console script.', 'error', e.message);
+    publish(); // fallback to the old console-script method
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = old; }
+  }
 }
 function publish(){
   var t = parseTarget();
