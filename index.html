@@ -197,17 +197,15 @@ function dlg(id){ el(id).showModal(); }
 function closeDlg(id){ el(id).close(); }
 
 /* ============ state ============ */
-var LS_KEY = 'jai-forge-v4';
+var lastKnownGood = '';
 function saveState(){
+  var current = cm ? cm.getValue() : '';
+  // never let a teardown/blank moment overwrite real work
+  if (!current.trim() && lastKnownGood.trim()) return;
+  lastKnownGood = current;
   try { localStorage.setItem(LS_KEY, JSON.stringify({
-    target: val('target'), token: val('token'), html: cm ? cm.getValue() : ''
+    target: val('target'), token: val('token'), html: current
   })); } catch(e){}
-}
-function loadState(){
-  try { var s = JSON.parse(localStorage.getItem(LS_KEY) || '{}');
-    el('target').value = s.target || ''; el('token').value = s.token || '';
-    return s.html || '';
-  } catch(e){ return ''; }
 }
 
 /* ============ CodeMirror init ============ */
@@ -221,8 +219,13 @@ var cm = CodeMirror.fromTextArea(el('html'), {
   gutters: ['CodeMirror-linenumbers', 'CodeMirror-foldgutter'],
   tabSize: 2
 });
-cm.setValue(loadState());
+var booting = true;
+var saved = loadState();
+cm.setValue(saved);
+lastKnownGood = saved;
+booting = false;
 cm.on('change', function(){
+  if (booting) return;
   el('stat').textContent = cm.getValue().length.toLocaleString() + ' chars';
   schedulePreview(); saveState();
 });
